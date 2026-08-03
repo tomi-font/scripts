@@ -1,0 +1,39 @@
+#!/bin/bash
+
+if [ "$#" -eq 1 ]; then
+	end_commit=$1
+elif [ "$#" -eq 2 ]; then
+	end_commit=$2
+else
+	echo "Usage: $0 <start-commit> <end-commit>"
+	exit 1
+fi
+
+start_commit=$1
+
+# Function to check if a commit is a clean cherry-pick
+check_cherry_pick() {
+	local commit=$1
+
+	# Extract the original commit hash from the commit message
+	local original_commit=$(git log -1 --pretty=%B $commit | grep -oP '(?<=cherry picked from commit )\w+' | tail -n1)
+
+	if [ -z "$original_commit" ]; then
+		echo "Commit $commit does not contain 'cherry picked from commit <hash>' in its message."
+		return 1
+	fi
+
+	local printed_commit="$commit (on $(git branch -a --contains $original_commit | grep remotes | sed 's/  remotes\///') after $(git describe --abbrev=0 $original_commit))"
+
+	if diff <(git show -p $original_commit | git patch-id | cut -d' ' -f1) <(git show -p $commit | git patch-id | cut -d' ' -f1) > /dev/null; then
+		echo "$printed_commit OK"
+	else
+		echo "Commit $printed_commit is NOT a clean cherry-pick of $original_commit."
+		git range-diff "$original_commit^..$original_commit" "$commit^..$commit"
+	fi
+}
+
+# Iterate over each commit in the range
+for commit in $(git rev-list --reverse $start_commit^..$end_commit); do
+	check_cherry_pick $commit
+done

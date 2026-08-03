@@ -1,0 +1,39 @@
+#!/bin/bash
+
+if [ $# -lt 2 -o $# -gt 3 ]; then
+	echo "usage: $0 <PR> <from revision> [<remote>]"
+	exit 1
+fi
+
+pr_num=$(cut -d / -f 7 <<< $1 | cut -d# -f1)
+from_rev=$(cut -d / -f 7 <<< $2)
+if [ $# == 3 ]; then
+	remote=$3
+else
+	if git remote | grep -q '^origin$'; then
+		remote=origin
+	else
+		remote=ncs
+	fi
+fi
+
+repo=$(cut -d / -f 4-5 <<< $1)
+token=$(cat `dirname "$0"`/github_token)
+base=$(curl -s -H "Authorization: token $token" "https://api.github.com/repos/$repo/pulls/$pr_num" | jq -r '.base.ref')
+if [ "$base" == 'null' ]; then
+	echo "Failed to retrieve .base.ref"
+	exit 1
+fi
+
+branch_commit_count() {
+	git rev-list --count $(git merge-base "$remote/$base" $1)..$1
+}
+
+git fetch "$remote" "$base" "${from_rev}:from_rev" "pull/${pr_num}/head:to_rev" || exit $?
+
+from_count=$(branch_commit_count from_rev)
+to_count=$(branch_commit_count to_rev)
+
+git range-diff from_rev~${from_count}..from_rev to_rev~${to_count}..to_rev
+
+git branch -D from_rev to_rev
