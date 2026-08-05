@@ -1,15 +1,21 @@
 #!/bin/bash
 
-if [ "$#" -eq 1 ]; then
-	end_commit=$1
-elif [ "$#" -eq 2 ]; then
-	end_commit=$2
+if [ "$#" -eq 0 ]; then
+	start_commit='FETCH_HEAD'
 else
-	echo "Usage: $0 <start-commit> <end-commit>"
+	start_commit=$1
+fi
+
+
+if [ "$#" -eq 2 ]; then
+	end_commit=$2
+elif [ "$#" -le 1 ] && [ "$1" != '-h' ]; then
+	end_commit="$start_commit"
+else
+	echo "Usage: $0 [<start-commit> [<end-commit>]]"
 	exit 1
 fi
 
-start_commit=$1
 
 # Function to check if a commit is a clean cherry-pick
 check_cherry_pick() {
@@ -23,14 +29,21 @@ check_cherry_pick() {
 		return 1
 	fi
 
-	local printed_commit="$commit (on $(git branch -a --contains $original_commit | grep remotes | sed 's/  remotes\///') after $(git describe --abbrev=0 $original_commit))"
+	local from_branch
+	from_branch=$(git branch -a --contains $original_commit)
+	if [ "$?" -ne 0 ]; then
+		echo "Commit $commit points to a non-existing commit hash."
+		return 1
+	fi
+
+	local printed_commit="$commit (on $(echo "$from_branch" | grep remotes | sed 's/  remotes\///') after $(git describe --abbrev=0 $original_commit))"
 
 	if diff <(git show -p $original_commit | git patch-id | cut -d' ' -f1) <(git show -p $commit | git patch-id | cut -d' ' -f1) > /dev/null; then
 		echo "$printed_commit OK"
 	else
 		echo "Commit $printed_commit is NOT a clean cherry-pick of $original_commit."
-		git range-diff "$original_commit^..$original_commit" "$commit^..$commit"
 	fi
+	git range-diff "$original_commit^..$original_commit" "$commit^..$commit"
 }
 
 # Iterate over each commit in the range
