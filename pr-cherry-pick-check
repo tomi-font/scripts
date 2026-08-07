@@ -1,0 +1,22 @@
+#!/bin/bash
+
+if [ $# -ne 1 ]; then
+	echo "usage: $0 <PR URL>"
+	exit 1
+fi
+
+pr_num=$(cut -d / -f 7 <<< $1 | cut -d# -f1)
+remote=$(git remote -v | grep -m 1 -F "$(cut -d / -f 1-5 <<< $1)" | cut -d $'\t' -f 1)
+
+repo=$(cut -d / -f 4-5 <<< $1)
+token=$(cat `dirname "$0"`/github_token)
+base=$(curl -s -H "Authorization: token $token" "https://api.github.com/repos/$repo/pulls/$pr_num" | jq -r '.base.ref')
+if [ "$base" == 'null' ]; then
+	echo "Failed to retrieve .base.ref"
+	exit 1
+fi
+
+git fetch "$remote" "pull/${pr_num}/head" "$base" || exit $?
+count=$(git rev-list --count $(git merge-base "$remote/$base" FETCH_HEAD)..FETCH_HEAD)
+
+cherry-pick-check FETCH_HEAD~$((count - 1)) FETCH_HEAD
