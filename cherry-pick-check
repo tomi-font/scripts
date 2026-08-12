@@ -6,13 +6,18 @@ else
 	start_commit=$1
 fi
 
+if [ "$#" -eq 3 ]; then
+	title_tag=$3
+else
+	title_tag='(nrf|zep)'
+fi
 
-if [ "$#" -eq 2 ]; then
+if [ "$#" -ge 2 -a "$#" -le 3 ]; then
 	end_commit=$2
 elif [ "$#" -le 1 ] && [ "$1" != '-h' ]; then
 	end_commit="$start_commit"
 else
-	echo "Usage: $0 [<start-commit> [<end-commit>]]"
+	echo "Usage: $0 [<start commit> [<end commit> [<title tag>]]]"
 	exit 1
 fi
 
@@ -41,14 +46,14 @@ check_cherry_pick() {
 	# The lines of the range-diff that differ, stripped of the range-diff
 	# indentation and of the "[<abc> fromtree] " title prefix
 	local changes=$(git range-diff --no-color "$original_commit^..$original_commit" "$commit^..$commit" |
-		grep -E '^    [-+][[:space:]]*[^[:space:]]' | sed -E 's/^    (.)    (\[(nrf|zep) fromtree\] )?/\1/')
+		grep -E '^    [-+][[:space:]]*[^[:space:]]' | sed -E 's/^    (.)    (\['"$title_tag"' fromtree\] )?/\1/')
 	local title=$(git log -1 --pretty=%s $original_commit)
 	local expected="-$title
 +$title
 +(cherry picked from commit $original_commit)"
 
 	if [ "$changes" != "$expected" ]; then
-		echo "Commit $printed_commit is NOT a clean cherry-pick of $original_commit."
+		echo "Commit $printed_commit is NOT a correct cherry-pick of $original_commit."
 		git range-diff "$original_commit^..$original_commit" "$commit^..$commit"
 	else
 		echo "$printed_commit OK"

@@ -19,4 +19,6 @@ fi
 git fetch "$remote" "pull/${pr_num}/head" "$base" || exit $?
 count=$(git rev-list --count $(git merge-base "$remote/$base" FETCH_HEAD)..FETCH_HEAD)
 
-cherry-pick-check FETCH_HEAD~$((count - 1)) FETCH_HEAD
+title_prefix=$(cut -d / -f 4 <<< $1 | grep -o '^...')
+
+cherry-pick-check FETCH_HEAD~$((count - 1)) FETCH_HEAD $title_prefix
