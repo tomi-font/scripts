@@ -38,12 +38,21 @@ check_cherry_pick() {
 
 	local printed_commit="$commit (on $(echo "$from_branch" | grep remotes | sed 's/  remotes\///') after $(git describe --abbrev=0 $original_commit))"
 
-	if diff <(git show -p $original_commit | git patch-id | cut -d' ' -f1) <(git show -p $commit | git patch-id | cut -d' ' -f1) > /dev/null; then
-		echo "$printed_commit OK"
-	else
+	# The lines of the range-diff that differ, stripped of the range-diff
+	# indentation and of the "[<abc> fromtree] " title prefix
+	local changes=$(git range-diff --no-color "$original_commit^..$original_commit" "$commit^..$commit" |
+		grep -E '^    [-+][[:space:]]*[^[:space:]]' | sed -E 's/^    (.)    (\[(nrf|zep) fromtree\] )?/\1/')
+	local title=$(git log -1 --pretty=%s $original_commit)
+	local expected="-$title
++$title
++(cherry picked from commit $original_commit)"
+
+	if [ "$changes" != "$expected" ]; then
 		echo "Commit $printed_commit is NOT a clean cherry-pick of $original_commit."
+		git range-diff "$original_commit^..$original_commit" "$commit^..$commit"
+	else
+		echo "$printed_commit OK"
 	fi
-	git range-diff "$original_commit^..$original_commit" "$commit^..$commit"
 }
 
 # Iterate over each commit in the range
