@@ -6,8 +6,12 @@ if [ $# -ne 2 ]; then
 fi
 
 pr_num=$(cut -d / -f 7 <<< $1 | cut -d# -f1)
-remote=$(git remote -v | grep -m 1 -F "$(cut -d / -f 1-5 <<< $1)" | cut -d $'\t' -f 1)
 from_rev=$(cut -d / -f 7 <<< $2)
+remote=$(git remote -v | grep -m 1 -F "$(cut -d / -f 1-5 <<< $1)" | cut -d $'\t' -f 1)
+if [ "$remote" = "" ]; then
+	echo "missing remote"
+	exit 1
+fi
 
 repo=$(cut -d / -f 4-5 <<< $1)
 token=$(cat `dirname "$0"`/github_token)
